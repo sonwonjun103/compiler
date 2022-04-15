@@ -25,7 +25,7 @@ FILE* source; //source file
 FILE* listing; //listing output text file
 
 typedef enum
-{START, INNUM, INID, INCAL, MULTI_CAL,INCH, DONE,INASSIGN,MULTI_ASSIGN,IN_COMMENT1,IN_COMMENT2, IN_COMMENT3, IN_COMMENT_FINAL,ERROR_STATE} StateType;
+{START, INNUM, INID, INCAL, MULTI_CAL,INCH, DONE,IN_COMMENT1,IN_COMMENT2, IN_COMMENT3, IN_COMMENT_FINAL,ERROR_STATE} StateType;
 
 typedef enum {
 	//book keeping tokens
@@ -55,16 +55,19 @@ int main() {
 	char pgm[20];
 	char token[MAXTOKENLEN];
 	//소스 파일 입력
-	scanf("%s", pgm);
+	char output[20];
 
+	scanf("%s", pgm);
+	scanf("%s", output);
 	source = fopen(pgm, "r");
+	listing = fopen(output, "w+");
 
 	if (source == NULL) {
 		fprintf(stderr, "FILE is not found\n");
 		exit(1);
 	}
 
-	listing = stdout;
+	
 	fprintf(listing, "\n TINY COMLIATION: %s\n", pgm);
 
 	getToken();
@@ -93,9 +96,6 @@ void printToken(TokenType token, const char* tokenString) {
 		break;
 	case BACKSLASH:
 		fprintf(listing, "/\n");
-		break;
-	case MUL_ASSIGN:
-		fprintf(listing, ":=\n");
 		break;
 	case LPAREN: 
 		fprintf(listing, "{\n"); 
@@ -206,9 +206,6 @@ TokenType getToken(void) {
 			else if (c == '/') {
 				state = IN_COMMENT1;
 			}
-			else if (c == ':') {
-				state = INASSIGN;
-			}
 			else if ((c == ' ') || (c == '\t') || (c == '\n')) {
 				save = FALSE;
 			}
@@ -219,6 +216,9 @@ TokenType getToken(void) {
 				case EOF:
 					save = FALSE;
 					currentToken = ENDFILE;
+					break;
+				case ':':
+					currentToken = ASSIGN;
 					break;
 				case '?':
 					currentToken = QUESTION;
@@ -281,26 +281,11 @@ TokenType getToken(void) {
 				state = MULTI_CAL;
 			}
 			else {
-				state = DONE;
 				save = FALSE;
+				ungetNextChar();
 				currentToken = CAL;
-			}
-			break;
-		case INASSIGN:
-			if (c == '=') {
-				save = TRUE;
-				state = MULTI_ASSIGN;
-			}
-			else {
 				state = DONE;
-				save = FALSE;
-				currentToken = ASSIGN;
 			}
-			break;
-		case MULTI_ASSIGN:
-			save = FALSE;
-			state = DONE;
-			currentToken = MUL_ASSIGN;
 			break;
 		case MULTI_CAL:
 			save = FALSE;
@@ -320,7 +305,8 @@ TokenType getToken(void) {
 			}
 			else {
 				save = TRUE;
-				state = DONE;
+				state = DONE; 
+				ungetNextChar();
 				currentToken = BACKSLASH;
 			}
 			break;
@@ -334,27 +320,20 @@ TokenType getToken(void) {
 		case IN_COMMENT3:
 			save = FALSE;
 			if (c == '/') {
-				state = IN_COMMENT_FINAL;
-			}
-			else {
-				state = ERROR_STATE;
-			}
-			break;
-		case IN_COMMENT_FINAL:
-			save = FALSE;
-			if ((c == '\n') || (c == '\t')) {
 				state = START;
 			}
+			else if (c == '*') {
+				state = IN_COMMENT3;
+			}
 			else {
-				state = ERROR_STATE;
+				state = IN_COMMENT2;
 			}
 			break;
 		case ERROR_STATE:
 			fprintf(listing, "\tstop ending before\n");
-			state = DONE;
+			state = START;
 			save = FALSE;
 			currentToken = ERROR;
-			return;
 			break;
 		case DONE:
 			state = START;
@@ -388,8 +367,5 @@ void Trace_Scan(TokenType currentToken) {
 }
 
 void init_char(char* a) {
-	int len = strlen(a);
-	for (int i = 0; i < len; i++) {
-		a[i] = '\0';
-	}
+	memset(a, '\0', sizeof(a));
 }
